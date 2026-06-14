@@ -13,8 +13,8 @@ celery
 redis
 sse-starlette
 
-passlib[bcrypt]
-bcrypt
+passlib[argon2]
+argon2-cffi
 PyJWT
 email-validator
 
