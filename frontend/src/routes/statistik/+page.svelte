@@ -19,13 +19,13 @@
     error = '';
     try {
       stat = await api.statistik(periode);
-      await tick();
-      drawBar();
     } catch (e) {
       error = e?.message || 'Gagal memuat statistik';
     } finally {
       loading = false;
     }
+    await tick();
+    drawBar();
   }
 
   function onPeriodeChange() {
