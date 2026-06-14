@@ -8,7 +8,7 @@ done
 echo "[entrypoint] Postgres ready."
 
 echo "[entrypoint] Running alembic upgrade head..."
-alembic upgrade head || alembic stamp head
+alembic upgrade head
 
 echo "[entrypoint] Starting: $*"
 exec "$@"
