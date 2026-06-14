@@ -1,11 +1,12 @@
 <script>
-  import { UserPlus, Lock, Mail, User as UserIcon, Sparkles } from 'lucide-svelte';
+  import { UserPlus, Lock, Mail, User as UserIcon, Sparkles, Eye, EyeOff } from 'lucide-svelte';
   import { goto } from '$app/navigation';
   import { register } from '$lib/auth.js';
 
   let nama = '';
   let email = '';
   let password = '';
+  let showPassword = false;
   let busy = false;
   let error = '';
 
@@ -63,8 +64,12 @@
           <label class="text-white text-sm font-medium mb-2 block">Password</label>
           <div class="relative">
             <Lock class="absolute left-4 top-1/2 -translate-y-1/2 text-white/60" size="20" />
-            <input type="password" required bind:value={password} placeholder="Min. 6 karakter"
-              class="w-full pl-12 pr-4 py-3.5 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/50 focus:outline-none focus:border-white/50" />
+            <input type={showPassword ? 'text' : 'password'} required bind:value={password} placeholder="Min. 6 karakter"
+              class="w-full pl-12 pr-12 py-3.5 bg-white/20 border border-white/30 rounded-xl text-white placeholder-white/50 focus:outline-none focus:border-white/50" />
+            <button type="button" on:click={() => (showPassword = !showPassword)}
+              class="absolute right-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white">
+              {#if showPassword}<EyeOff size="20" />{:else}<Eye size="20" />{/if}
+            </button>
           </div>
         </div>
 
