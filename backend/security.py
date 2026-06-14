@@ -11,18 +11,18 @@ from config import get_settings
 from database import get_db
 from models import User
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__truncate_error=False)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
 settings = get_settings()
 
 
 def hash_password(plain: str) -> str:
-    return pwd_context.hash(plain.encode()[:72])
+    return pwd_context.hash(plain)
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain.encode()[:72], hashed)
+    return pwd_context.verify(plain, hashed)
 
 
 def create_access_token(sub: str, extra: Optional[dict] = None) -> str:
