@@ -19,7 +19,6 @@ class ItemOut(ItemIn):
 class TransaksiIn(BaseModel):
     kategori_id: int
     nominal: Decimal = Field(ge=0)
-    kategori: Optional[str] = Field(default=None, max_length=255)
     merchant: Optional[str] = Field(default=None, max_length=255)
     tanggal_transaksi: date
     deskripsi: Optional[str] = None

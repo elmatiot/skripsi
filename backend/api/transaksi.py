@@ -8,9 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from database import get_db
 from models import ItemTransaksi, Kategori, Transaksi, User
-from schemas.transaksi import (
-    ItemOut, TransaksiIn, TransaksiListOut, TransaksiOut,
-)
+from schemas.transaksi import ItemOut, TransaksiIn, TransaksiListOut, TransaksiOut
 from security import get_current_user
 
 router = APIRouter(prefix="/transaksi", tags=["transaksi"])
@@ -21,7 +19,7 @@ def _to_out(trx: Transaksi, tipe: Optional[str] = None) -> TransaksiOut:
         id=trx.id,
         kategori_id=trx.kategori_id,
         nominal=trx.nominal,
-        kategori=trx.kategori,
+        kategori=trx.kategori.nama if trx.kategori else None,
         merchant=trx.merchant,
         tanggal_transaksi=trx.tanggal_transaksi,
         deskripsi=trx.deskripsi,
@@ -29,7 +27,7 @@ def _to_out(trx: Transaksi, tipe: Optional[str] = None) -> TransaksiOut:
         nota_id=trx.nota_id,
         created_at=trx.created_at,
         items=[ItemOut.model_validate(it) for it in trx.items],
-        tipe=tipe if tipe is not None else (trx.kategori_obj.tipe if trx.kategori_obj else None),
+        tipe=tipe if tipe is not None else (trx.kategori.tipe if trx.kategori else None),
     )
 
 
@@ -54,7 +52,7 @@ def list_transaksi(
 ):
     q = (
         db.query(Transaksi)
-        .options(selectinload(Transaksi.items), selectinload(Transaksi.kategori_obj))
+        .options(selectinload(Transaksi.items), selectinload(Transaksi.kategori))
         .filter(Transaksi.user_id == user.id)
     )
     if tipe in {"pemasukan", "pengeluaran"}:
@@ -96,7 +94,6 @@ def create_transaksi(
         user_id=user.id,
         kategori_id=payload.kategori_id,
         nominal=_compute_nominal(payload),
-        kategori=payload.kategori or kategori.nama,
         merchant=payload.merchant,
         tanggal_transaksi=payload.tanggal_transaksi,
         deskripsi=payload.deskripsi,
@@ -128,7 +125,7 @@ def get_transaksi(
 ):
     trx = (
         db.query(Transaksi)
-        .options(selectinload(Transaksi.items), selectinload(Transaksi.kategori_obj))
+        .options(selectinload(Transaksi.items), selectinload(Transaksi.kategori))
         .filter(Transaksi.id == trx_id, Transaksi.user_id == user.id)
         .first()
     )
@@ -157,7 +154,6 @@ def update_transaksi(
         raise HTTPException(422, detail="Kategori tidak ditemukan")
 
     trx.kategori_id = payload.kategori_id
-    trx.kategori = payload.kategori or kategori.nama
     trx.merchant = payload.merchant
     trx.tanggal_transaksi = payload.tanggal_transaksi
     trx.deskripsi = payload.deskripsi

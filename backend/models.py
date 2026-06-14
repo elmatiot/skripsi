@@ -66,7 +66,6 @@ class Transaksi(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     kategori_id = Column(Integer, ForeignKey("kategori.id", ondelete="RESTRICT"), nullable=False)
     nominal = Column(Numeric(15, 2), nullable=False)
-    kategori = Column(String(255), nullable=True)
     merchant = Column(String(255), nullable=True)
     tanggal_transaksi = Column(Date, nullable=False, index=True)
     deskripsi = Column(Text, nullable=True)
@@ -74,7 +73,7 @@ class Transaksi(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     user = relationship("User", back_populates="transaksi")
-    kategori_obj = relationship("Kategori", back_populates="transaksi")
+    kategori = relationship("Kategori", back_populates="transaksi")
     nota = relationship("Nota", back_populates="transaksi", foreign_keys=[nota_id])
     items = relationship("ItemTransaksi", back_populates="transaksi", cascade="all, delete-orphan")
     klasifikasi_logs = relationship(
