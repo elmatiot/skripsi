@@ -18,11 +18,11 @@ settings = get_settings()
 
 
 def hash_password(plain: str) -> str:
-    return pwd_context.hash(plain)
+    return pwd_context.hash(plain.encode()[:72])
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return pwd_context.verify(plain.encode()[:72], hashed)
 
 
 def create_access_token(sub: str, extra: Optional[dict] = None) -> str:
