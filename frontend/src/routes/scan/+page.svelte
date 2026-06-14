@@ -62,8 +62,15 @@
 
   async function saveTransaksi() {
     if (!result || result.ocr_status !== 'Sesuai') return;
-    const kat = kategoriList.find((k) => k.nama?.toLowerCase() === (result.kategori || '').toLowerCase())
-      || kategoriList[0];
+    let kat = kategoriList.find(
+      (k) => k.nama?.toLowerCase() === (result.kategori || '').toLowerCase()
+    );
+    if (!kat && result.kategori) {
+      kat = await api.createKategori({ nama: result.kategori, tipe: 'pengeluaran' });
+      kategoriList = [...kategoriList, kat];
+    }
+    if (!kat) kat = kategoriList[0];
+    if (!kat) return (error = 'Pilih atau buat kategori dulu');
     const payload = {
       kategori_id: kat.id,
       nominal: Number(result.total) || 0,

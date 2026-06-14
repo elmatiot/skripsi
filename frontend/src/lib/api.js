@@ -55,6 +55,7 @@ export const api = {
 
   // Kategori
   listKategori: (tipe) => request(`/kategori${tipe ? `?tipe=${tipe}` : ''}`),
+  createKategori: (body) => request('/kategori', { method: 'POST', body }),
 
   // Transaksi
   listTransaksi: (params = {}) => {

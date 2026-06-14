@@ -20,6 +20,10 @@
   let error = '';
   let success = '';
 
+  let showBuatKategori = false;
+  let namaKategoriBaru = '';
+  let busyKategori = false;
+
   const items = writable([{ nama_item: '', qty: 1, harga_satuan: 0 }]);
   const totalDerived = derived(items, ($items) =>
     $items.reduce((acc, it) => acc + Number(it.harga_satuan || 0) * Number(it.qty || 0), 0)
@@ -34,6 +38,22 @@
   onMount(async () => {
     kategori = await api.listKategori();
   });
+
+  async function simpanKategoriBaru() {
+    if (!namaKategoriBaru.trim()) return;
+    busyKategori = true;
+    try {
+      const baru = await api.createKategori({ nama: namaKategoriBaru.trim(), tipe });
+      if (!kategori.find((k) => k.id === baru.id)) kategori = [...kategori, baru];
+      kategoriId = baru.id;
+      namaKategoriBaru = '';
+      showBuatKategori = false;
+    } catch (e) {
+      error = e?.message || 'Gagal membuat kategori';
+    } finally {
+      busyKategori = false;
+    }
+  }
 
   function addItem() {
     items.update((arr) => [...arr, { nama_item: '', qty: 1, harga_satuan: 0 }]);
@@ -109,8 +129,27 @@
       </div>
 
       <div>
-        <label class="text-sm font-medium text-gray-700 mb-1 block">Kategori</label>
+        <div class="flex items-center justify-between mb-1">
+          <label class="text-sm font-medium text-gray-700">Kategori</label>
+          <button type="button" on:click={() => { showBuatKategori = !showBuatKategori; namaKategoriBaru = ''; }}
+            class="text-xs text-indigo-600 font-medium">
+            {showBuatKategori ? 'Batal' : '+ Buat baru'}
+          </button>
+        </div>
+        {#if showBuatKategori}
+          <div class="flex gap-2 mb-2">
+            <input type="text" bind:value={namaKategoriBaru} placeholder="Nama kategori baru"
+              class="flex-1 px-3 py-2 border border-indigo-300 rounded-xl text-sm focus:outline-none focus:border-indigo-500" />
+            <button type="button" on:click={simpanKategoriBaru} disabled={busyKategori || !namaKategoriBaru.trim()}
+              class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-semibold disabled:opacity-50">
+              {busyKategori ? '...' : 'Simpan'}
+            </button>
+          </div>
+        {/if}
         <select bind:value={kategoriId} class="w-full px-4 py-3 border border-gray-200 rounded-xl bg-white">
+          {#if filteredKategori.length === 0}
+            <option disabled value={null}>Belum ada kategori — buat baru di atas</option>
+          {/if}
           {#each filteredKategori as k}
             <option value={k.id}>{k.nama}</option>
           {/each}
