@@ -15,7 +15,7 @@
   let deskripsi = '';
   let metodeBayar = 'tunai';
   let tanggal = new Date().toISOString().slice(0, 10);
-  let nominalManual = 0;
+  let nominalStr = '';
   let busy = false;
   let error = '';
   let success = '';
@@ -28,6 +28,21 @@
   const totalDerived = derived(items, ($items) =>
     $items.reduce((acc, it) => acc + Number(it.harga_satuan || 0) * Number(it.qty || 0), 0)
   );
+
+  function formatRibu(n) {
+    return String(Math.floor(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+  function parseRibu(s) {
+    return Number(String(s).replace(/\./g, '')) || 0;
+  }
+  function onNominalInput(e) {
+    const digits = e.target.value.replace(/\D/g, '');
+    nominalStr = digits ? formatRibu(digits) : '';
+    e.target.value = nominalStr;
+  }
+
+  // Jika item ditambah, sinkronkan nominal dengan subtotal item
+  $: if ($totalDerived > 0) nominalStr = formatRibu($totalDerived);
 
   $: filteredKategori = kategori.filter((k) => k.tipe === tipe);
 
@@ -75,8 +90,8 @@
         harga_satuan: Number(i.harga_satuan)
       }));
 
-    const nominalFinal = validItems.length ? $totalDerived : Number(nominalManual) || 0;
-    if (nominalFinal <= 0) return (error = 'Nominal harus > 0');
+    const nominalFinal = parseRibu(nominalStr);
+    if (nominalFinal <= 0) return (error = 'Nominal wajib diisi dan harus > 0');
 
     const payload = {
       kategori_id: kategoriId,
@@ -180,8 +195,25 @@
       </div>
 
       <div>
+        <label class="text-sm font-medium text-gray-700 mb-1 block">
+          Nominal <span class="text-red-500">*</span>
+        </label>
+        <div class="relative">
+          <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">Rp</span>
+          <input
+            type="text"
+            inputmode="numeric"
+            placeholder="0"
+            value={nominalStr}
+            on:input={onNominalInput}
+            class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-indigo-500 text-right font-semibold text-gray-800"
+          />
+        </div>
+      </div>
+
+      <div>
         <div class="flex items-center justify-between mb-2">
-          <label class="text-sm font-medium text-gray-700">Item (opsional, otomatis menjadi nominal)</label>
+          <label class="text-sm font-medium text-gray-700">Item (opsional — mengisi nominal otomatis)</label>
           <button on:click={addItem} class="text-xs font-medium text-indigo-600 inline-flex items-center gap-1">
             <Plus size="14" /> Tambah
           </button>
@@ -193,24 +225,18 @@
                 class="col-span-5 px-3 py-2 border border-gray-200 rounded-lg text-sm" />
               <input type="number" min="1" bind:value={it.qty}
                 class="col-span-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-center" />
-              <input type="number" min="0" bind:value={it.harga_satuan} placeholder="Harga"
+              <input type="number" bind:value={it.harga_satuan} placeholder="Harga"
                 class="col-span-4 px-3 py-2 border border-gray-200 rounded-lg text-sm" />
               <button on:click={() => removeItem(idx)} class="col-span-1 text-red-500"><Trash2 size="16" /></button>
             </div>
           {/each}
         </div>
-        <p class="text-right text-sm text-gray-600 mt-2">
-          Subtotal item: <span class="font-bold text-indigo-600">{formatRupiah($totalDerived)}</span>
-        </p>
+        {#if $totalDerived > 0}
+          <p class="text-right text-sm text-gray-600 mt-2">
+            Subtotal: <span class="font-bold text-indigo-600">{formatRupiah($totalDerived)}</span>
+          </p>
+        {/if}
       </div>
-
-      {#if $totalDerived === 0}
-        <div>
-          <label class="text-sm font-medium text-gray-700 mb-1 block">Nominal manual</label>
-          <input type="number" min="0" bind:value={nominalManual} placeholder="0"
-            class="w-full px-4 py-3 border border-gray-200 rounded-xl" />
-        </div>
-      {/if}
 
       <button on:click={submit} disabled={busy}
         class="w-full py-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold disabled:opacity-60">
