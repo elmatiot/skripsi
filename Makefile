@@ -1,6 +1,8 @@
 # Shortcut commands. Jalankan `make help` utk daftar lengkap.
 SHELL := /bin/bash
-COMPOSE ?= docker compose
+# Lokal pakai docker-compose.dev.yml (full stack + nginx + frontend dev).
+# docker-compose.yml di root khusus Dokploy (backend stack saja).
+COMPOSE ?= docker compose -f docker-compose.dev.yml
 
 .PHONY: help up down build logs migrate seed reset-db test
 
