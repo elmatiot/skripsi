@@ -42,7 +42,7 @@
       result = null;
       error = '';
     } catch {
-      document.getElementById('file-input')?.click();
+      document.getElementById('camera-input')?.click();
     }
   }
 
@@ -101,13 +101,16 @@
 
   <div class="px-6 -mt-4 space-y-4">
     <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm space-y-3">
-      <input id="file-input" type="file" accept="image/*" capture="environment" on:change={onPick} class="hidden" />
+      <!-- input kamera (fallback native) -->
+      <input id="camera-input" type="file" accept="image/*" capture="environment" on:change={onPick} class="hidden" />
+      <!-- input galeri (tanpa capture agar buka galeri, bukan kamera) -->
+      <input id="gallery-input" type="file" accept="image/*" on:change={onPick} class="hidden" />
       <div class="grid grid-cols-2 gap-2">
         <button on:click={takePhotoNative} class="bg-indigo-600 text-white py-3 rounded-xl font-semibold inline-flex items-center justify-center gap-2">
           <Camera size="18" /> Ambil Foto
         </button>
-        <label for="file-input" class="bg-gray-100 text-gray-700 py-3 rounded-xl font-semibold inline-flex items-center justify-center gap-2 cursor-pointer">
-          <Upload size="18" /> Pilih File
+        <label for="gallery-input" class="bg-gray-100 text-gray-700 py-3 rounded-xl font-semibold inline-flex items-center justify-center gap-2 cursor-pointer">
+          <Upload size="18" /> Pilih Galeri
         </label>
       </div>
 
