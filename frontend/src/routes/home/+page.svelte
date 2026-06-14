@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { User, ArrowDownRight, ArrowUpRight, Sparkles, Plus, Receipt } from 'lucide-svelte';
+  import { User, ArrowDownRight, ArrowUpRight, Sparkles, Plus, Receipt, Wallet, Pencil, ChevronRight } from 'lucide-svelte';
 
   import MobileShell from '$lib/components/MobileShell.svelte';
   import Loader from '$lib/components/Loader.svelte';
@@ -11,6 +11,7 @@
   let stat = null;
   let recent = [];
   let insights = [];
+  let budgets = [];
   let loading = true;
   let triggering = false;
   let errorMsg = '';
@@ -21,10 +22,11 @@
     loading = true;
     errorMsg = '';
     const periode = currentPeriode();
-    const [s, t, i] = await Promise.allSettled([
+    const [s, t, i, b] = await Promise.allSettled([
       api.statistik(periode),
       api.listTransaksi({ limit: 5 }),
-      api.listInsight()
+      api.listInsight(),
+      api.budgetStatus(periode)
     ]);
 
     if (s.status === 'fulfilled') stat = s.value;
@@ -34,9 +36,16 @@
     else if (!errorMsg) errorMsg = t.reason?.message || 'Gagal memuat transaksi';
 
     if (i.status === 'fulfilled') insights = i.value?.slice(0, 3) ?? [];
+    if (b.status === 'fulfilled') budgets = b.value || [];
 
     loading = false;
   }
+
+  $: budgetTotal = budgets.reduce((acc, x) => acc + Number(x.nominal_budget || 0), 0);
+  $: budgetTerpakai = budgets.reduce((acc, x) => acc + Number(x.terpakai || 0), 0);
+  $: budgetPersen = budgetTotal > 0 ? Math.round((budgetTerpakai / budgetTotal) * 100) : 0;
+  $: budgetOverflow = budgetPersen >= 100;
+  $: budgetWarn = budgetPersen >= 75 && !budgetOverflow;
 
   async function generateInsight() {
     triggering = true;
@@ -142,10 +151,44 @@
       {/if}
     </div>
 
+    <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+            <Wallet class="text-amber-600" size="16" />
+          </div>
+          <span class="font-semibold text-gray-800">Budget Bulan Ini</span>
+        </div>
+        <button on:click={() => goto('/budget')} aria-label="Edit budget"
+          class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition">
+          <Pencil class="text-gray-600" size="14" />
+        </button>
+      </div>
+
+      {#if budgets.length === 0}
+        <p class="text-sm text-gray-500">Belum ada budget. Tap <b>pensil</b> untuk mengatur.</p>
+      {:else}
+        <div class="flex justify-between text-sm mb-1">
+          <span class="text-gray-600">Terpakai</span>
+          <span class="font-semibold text-gray-800">
+            {formatRupiah(budgetTerpakai)} / {formatRupiah(budgetTotal)}
+          </span>
+        </div>
+        <div class="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+          <div class="h-full transition-all"
+            style="width: {Math.min(100, budgetPersen)}%; background-color: {budgetOverflow ? '#ef4444' : budgetWarn ? '#f59e0b' : '#6366f1'};"></div>
+        </div>
+        <p class="text-xs mt-1 {budgetOverflow ? 'text-red-600' : budgetWarn ? 'text-amber-600' : 'text-gray-500'}">
+          {budgetPersen}% terpakai
+          {#if budgetOverflow} • melebihi budget!{/if}
+        </p>
+      {/if}
+    </div>
+
     <div>
       <div class="flex items-center justify-between mb-3">
         <h3 class="font-bold text-gray-800">Transaksi Terbaru</h3>
-        <a href="/manual" class="text-xs text-indigo-600 font-medium">Lihat semua</a>
+        <a href="/transaksi" class="text-xs text-indigo-600 font-medium">Lihat semua</a>
       </div>
       {#if loading}
         <Loader />
@@ -157,14 +200,20 @@
       {:else}
         <ul class="space-y-2">
           {#each recent as t}
-            <li class="bg-white rounded-2xl p-4 border border-gray-100 flex items-center justify-between">
-              <div>
-                <p class="font-semibold text-gray-800">{labelTransaksi(t)}</p>
-                <p class="text-xs text-gray-500">{t.tanggal_transaksi}</p>
-              </div>
-              <span class="font-bold {t.tipe === 'pemasukan' ? 'text-green-600' : 'text-red-600'}">
-                {t.tipe === 'pemasukan' ? '+' : '-'} {formatRupiah(t.nominal)}
-              </span>
+            <li>
+              <button on:click={() => goto(`/transaksi/${t.id}`)}
+                class="w-full bg-white rounded-2xl p-4 border border-gray-100 flex items-center justify-between text-left hover:bg-gray-50 transition">
+                <div class="flex-1 min-w-0">
+                  <p class="font-semibold text-gray-800 truncate">{labelTransaksi(t)}</p>
+                  <p class="text-xs text-gray-500">{t.tanggal_transaksi}</p>
+                </div>
+                <div class="flex items-center gap-1 shrink-0">
+                  <span class="font-bold {t.tipe === 'pemasukan' ? 'text-green-600' : 'text-red-600'}">
+                    {t.tipe === 'pemasukan' ? '+' : '-'} {formatRupiah(t.nominal)}
+                  </span>
+                  <ChevronRight class="text-gray-400" size="18" />
+                </div>
+              </button>
             </li>
           {/each}
         </ul>
