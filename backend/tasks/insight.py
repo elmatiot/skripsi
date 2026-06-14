@@ -1,3 +1,4 @@
+import logging
 from datetime import date, timedelta
 
 from celery import shared_task
@@ -6,6 +7,8 @@ from sqlalchemy import func
 from database import SessionLocal
 from deepseek_client import chat as deepseek_chat
 from models import AIInsight, AIMemory, Kategori, Transaksi
+
+log = logging.getLogger(__name__)
 
 
 def _build_user_summary(db, user_id: int) -> dict:
@@ -78,26 +81,34 @@ yang spesifik, actionable, max 3 kalimat. Jawab dalam JSON murni:
 {summary}
 """
 
-        raw = deepseek_chat(prompt)
+        judul = "Insight Keuangan"
+        konten = ""
+        tipe = "general"
 
-        import json, re
-        m = re.search(r"\{.*\}", raw, flags=re.DOTALL)
-        parsed = {}
-        if m:
-            try:
-                parsed = json.loads(m.group(0))
-            except Exception:
-                parsed = {}
-
-        judul = parsed.get("judul") or "Insight Keuangan"
-        konten = parsed.get("konten") or raw[:500]
-        tipe = parsed.get("tipe") or "general"
+        try:
+            raw = deepseek_chat(prompt)
+            import json, re
+            m = re.search(r"\{.*\}", raw, flags=re.DOTALL)
+            parsed = {}
+            if m:
+                try:
+                    parsed = json.loads(m.group(0))
+                except Exception:
+                    parsed = {}
+            judul = parsed.get("judul") or "Insight Keuangan"
+            konten = parsed.get("konten") or (raw or "")[:500]
+            tipe = parsed.get("tipe") or "general"
+        except Exception as e:
+            log.exception("DeepSeek call gagal")
+            judul = "Insight gagal dibuat"
+            konten = f"Tidak bisa menghubungi AI: {e}. Coba lagi nanti atau cek konfigurasi DEEPSEEK_API_KEY."
+            tipe = "warning"
 
         ins = AIInsight(
             user_id=uid,
-            judul=judul[:160],
-            konten=konten,
-            tipe=tipe[:40],
+            judul=(judul or "Insight Keuangan")[:160],
+            konten=konten or "(kosong)",
+            tipe=(tipe or "general")[:40],
         )
         db.add(ins)
         db.commit()
