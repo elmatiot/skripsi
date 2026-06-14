@@ -1,0 +1,143 @@
+name: skripsi-finance
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: skripsi-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-7yE85DRbzdFrgapV}
+      POSTGRES_DB: ${POSTGRES_DB:-dbfinace}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-dbfinace}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [appnet]
+
+  redis:
+    image: redis:7-alpine
+    container_name: skripsi-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [appnet]
+
+  backend:
+    build: ./backend
+    container_name: skripsi-backend
+    restart: unless-stopped
+    env_file: ./backend/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - backend_uploads:/app/uploads
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    networks: [appnet]
+
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+    container_name: skripsi-celery-worker
+    restart: unless-stopped
+    env_file: ./backend/.env
+    depends_on:
+      backend:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: ["celery", "-A", "celery_app.celery", "worker", "--loglevel=info", "-Q", "default,insight,memory"]
+    networks: [appnet]
+
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+    container_name: skripsi-celery-beat
+    restart: unless-stopped
+    env_file: ./backend/.env
+    depends_on:
+      celery_worker:
+        condition: service_started
+    volumes:
+      - ./backend:/app
+    command: ["celery", "-A", "celery_app.celery", "beat", "--loglevel=info"]
+    networks: [appnet]
+
+  frontend:
+    build: ./frontend
+    container_name: skripsi-frontend
+    restart: unless-stopped
+    env_file: ./frontend/.env
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]
+    networks: [appnet]
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: skripsi-nginx
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+      - certgen
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - tls_certs:/etc/nginx/certs:ro
+    networks: [appnet]
+
+  # Quick public tunnel via Cloudflare — dapat URL https://*.trycloudflare.com (no domain needed).
+  # URL berubah setiap restart. Untuk URL permanen, login dgn akun Cloudflare.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: skripsi-cloudflared
+    restart: unless-stopped
+    depends_on:
+      - nginx
+    command: tunnel --no-autoupdate --url https://nginx --no-tls-verify
+    networks: [appnet]
+
+  # One-shot helper: generates a self-signed cert with SANs (localhost, 127.0.0.1, host LAN IP)
+  certgen:
+    image: alpine:3.20
+    container_name: skripsi-certgen
+    environment:
+      CERT_SANS: ${CERT_SANS:-DNS:localhost,IP:127.0.0.1,IP:192.168.100.103}
+      CERT_CN: ${CERT_CN:-skripsi-finance.local}
+    volumes:
+      - tls_certs:/certs
+      - ./nginx/certgen.sh:/certgen.sh:ro
+    command: ["sh", "/certgen.sh"]
+    networks: [appnet]
+
+volumes:
+  postgres_data:
+  redis_data:
+  backend_uploads:
+  tls_certs:
+
+networks:
+  appnet:
+    driver: bridge

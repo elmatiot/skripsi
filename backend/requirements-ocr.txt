@@ -1,0 +1,4 @@
+# Dependency berat untuk OCR / VLM — hanya dipakai oleh service `backend`,
+# bukan oleh celery worker/beat. Dipisahkan supaya build worker cepat.
+paddlepaddle==2.6.2
+paddleocr==2.8.1

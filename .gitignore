@@ -1,0 +1,50 @@
+# Env files
+.env
+backend/.env
+frontend/.env
+**/.env.local
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Node
+node_modules/
+.svelte-kit/
+build/
+dist/
+.vite/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+.claude/
+
+# Uploads
+backend/uploads/
+backend/temp_*
+
+# Capacitor build artifacts
+android/
+ios/
+www/
+
+# Models / large binaries
+*.pdmodel
+*.pdiparams
+*.pdparams
+output/
+PaddleOCR/
+
+# Celery runtime
+celerybeat-schedule
+backend/celerybeat-schedule
