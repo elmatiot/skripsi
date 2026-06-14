@@ -9,12 +9,16 @@
   let insights = [];
   let loading = true;
   let busy = false;
+  let errorMsg = '';
   let es;
 
   async function refresh() {
     loading = true;
+    errorMsg = '';
     try {
       insights = await api.listInsight();
+    } catch (e) {
+      errorMsg = e?.message || 'Gagal memuat insight';
     } finally {
       loading = false;
     }
@@ -22,9 +26,12 @@
 
   async function generate() {
     busy = true;
+    errorMsg = '';
     try {
       await api.generateInsight();
       setTimeout(refresh, 2500);
+    } catch (e) {
+      errorMsg = e?.message || 'Gagal generate insight';
     } finally {
       setTimeout(() => (busy = false), 2500);
     }
@@ -62,6 +69,9 @@
   </div>
 
   <div class="px-6 -mt-4 space-y-3">
+    {#if errorMsg}
+      <div class="bg-red-50 border border-red-200 text-red-700 rounded-2xl px-4 py-3 text-sm">{errorMsg}</div>
+    {/if}
     {#if loading}
       <Loader />
     {:else if insights.length === 0}

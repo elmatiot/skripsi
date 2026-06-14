@@ -1,15 +1,18 @@
 import asyncio
 import json
+import logging
 from typing import List
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 
-from database import get_db
+from database import SessionLocal, get_db
 from models import AIInsight, User
 from schemas.insight import InsightOut, InsightTriggerOut
 from security import get_current_user
+
+log = logging.getLogger("uvicorn.error")
 
 router = APIRouter(prefix="/insight", tags=["insight"])
 
@@ -35,14 +38,22 @@ def trigger_generate(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    # 1) Coba enqueue ke Celery (async, non-blocking)
     try:
         from celery_app import generate_insight_task
         task = generate_insight_task.delay(str(user.id))
         return InsightTriggerOut(task_id=task.id)
-    except Exception:
-        from tasks.insight import generate_insight_task as _fn
-        background_tasks.add_task(_fn, str(user.id))
-        return InsightTriggerOut(task_id="background")
+    except Exception as e:
+        log.warning("Celery enqueue gagal, fallback synchronous: %s", e)
+
+    # 2) Fallback: jalankan langsung di request (untuk dev/testing tanpa worker)
+    try:
+        from tasks.insight import generate_insight_task as _sync_task
+        insight_id = _sync_task(str(user.id))
+        return InsightTriggerOut(task_id=f"sync-{insight_id}", message="Insight dibuat (mode sync)")
+    except Exception as e:
+        log.exception("Generate insight gagal (sync fallback)")
+        raise HTTPException(status_code=502, detail=f"Generate insight gagal: {e}")
 
 
 @router.post("/{insight_id}/read", response_model=InsightOut)
@@ -67,34 +78,43 @@ def mark_read(
 @router.get("/stream")
 async def stream_insight(
     user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
+    user_id = user.id
     last_seen_id: set[int] = set()
 
     async def event_gen():
-        nonlocal last_seen_id
-        while True:
-            unread = (
-                db.query(AIInsight)
-                .filter(AIInsight.user_id == user.id, AIInsight.sudah_dibaca == False)  # noqa: E712
-                .order_by(AIInsight.created_at.desc())
-                .limit(5)
-                .all()
-            )
-            new = [r for r in unread if r.id not in last_seen_id]
-            for r in new:
-                last_seen_id.add(r.id)
-                yield {
-                    "event": "insight",
-                    "data": json.dumps({
-                        "id": r.id,
-                        "judul": r.judul,
-                        "konten": r.konten,
-                        "tipe": r.tipe,
-                        "created_at": r.created_at.isoformat(),
-                    }),
-                }
-            yield {"event": "ping", "data": "1"}
-            await asyncio.sleep(5)
+        try:
+            while True:
+                db = SessionLocal()
+                try:
+                    unread = (
+                        db.query(AIInsight)
+                        .filter(
+                            AIInsight.user_id == user_id,
+                            AIInsight.sudah_dibaca == False,  # noqa: E712
+                        )
+                        .order_by(AIInsight.created_at.desc())
+                        .limit(5)
+                        .all()
+                    )
+                    new = [r for r in unread if r.id not in last_seen_id]
+                    for r in new:
+                        last_seen_id.add(r.id)
+                        yield {
+                            "event": "insight",
+                            "data": json.dumps({
+                                "id": r.id,
+                                "judul": r.judul,
+                                "konten": r.konten,
+                                "tipe": r.tipe or "general",
+                                "created_at": r.created_at.isoformat(),
+                            }),
+                        }
+                finally:
+                    db.close()
+                yield {"event": "ping", "data": "1"}
+                await asyncio.sleep(5)
+        except asyncio.CancelledError:
+            return
 
     return EventSourceResponse(event_gen())
