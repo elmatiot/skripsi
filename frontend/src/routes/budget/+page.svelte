@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { Plus, Wallet, Trash2 } from 'lucide-svelte';
+  import { Plus, Wallet, Trash2, Pencil, X } from 'lucide-svelte';
 
   import MobileShell from '$lib/components/MobileShell.svelte';
   import Loader from '$lib/components/Loader.svelte';
@@ -18,10 +18,13 @@
   let loading = true;
   let periode = currentPeriode();
   let periodeInput = periodeToInput(periode);
+
   let formOpen = false;
   let formKategoriId = null;
-  let formNominal = 0;
+  let formNominalStr = '';
+  let editingId = null; // null = tambah baru, ada id = edit
   let busy = false;
+  let busyDelete = null;
 
   onMount(refresh);
 
@@ -44,17 +47,51 @@
     refresh();
   }
 
+  function formatRibu(n) {
+    return String(Math.floor(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+  function parseRibu(s) {
+    return Number(String(s).replace(/\./g, '')) || 0;
+  }
+  function onNominalInput(e) {
+    const digits = e.target.value.replace(/\D/g, '');
+    formNominalStr = digits ? formatRibu(digits) : '';
+    e.target.value = formNominalStr;
+  }
+
+  function openTambah() {
+    editingId = null;
+    formKategoriId = kategori[0]?.id ?? null;
+    formNominalStr = '';
+    formOpen = true;
+  }
+
+  function openEdit(s) {
+    const b = budgets.find((b) => b.kategori_id === s.kategori_id);
+    editingId = b?.id ?? null;
+    formKategoriId = s.kategori_id;
+    formNominalStr = formatRibu(s.nominal_budget);
+    formOpen = true;
+  }
+
+  function closeForm() {
+    formOpen = false;
+    editingId = null;
+    formNominalStr = '';
+  }
+
   async function saveBudget() {
+    const nominal = parseRibu(formNominalStr);
+    if (nominal <= 0) return;
     busy = true;
     try {
       await api.upsertBudget({
         kategori_id: formKategoriId,
-        nominal_budget: Number(formNominal),
+        nominal_budget: nominal,
         tahun: periode.tahun,
         bulan: periode.bulan
       });
-      formOpen = false;
-      formNominal = 0;
+      closeForm();
       await refresh();
     } finally {
       busy = false;
@@ -64,8 +101,13 @@
   async function removeBudget(id) {
     if (!id) return;
     if (!confirm('Hapus budget ini?')) return;
-    await api.deleteBudget(id);
-    await refresh();
+    busyDelete = id;
+    try {
+      await api.deleteBudget(id);
+      await refresh();
+    } finally {
+      busyDelete = null;
+    }
   }
 </script>
 
@@ -76,11 +118,11 @@
         <h1 class="text-2xl font-bold">Budget</h1>
         <p class="text-indigo-200 text-sm">Atur batas pengeluaran per kategori</p>
       </div>
-      <button on:click={() => (formOpen = !formOpen)} class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
+      <button on:click={openTambah}
+        class="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
         <Plus class="text-white" size="22" />
       </button>
     </div>
-
     <div class="mt-4">
       <label class="text-indigo-200 text-xs">Periode</label>
       <input type="month" bind:value={periodeInput} on:change={onPeriodeChange}
@@ -88,19 +130,46 @@
     </div>
   </div>
 
-  <div class="px-6 -mt-4 space-y-4">
+  <div class="px-6 -mt-4 space-y-4 pb-8">
     {#if formOpen}
       <div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
-        <h3 class="font-bold text-gray-800">Set Budget</h3>
-        <select bind:value={formKategoriId} class="w-full px-3 py-2 border rounded-lg">
-          {#each kategori as k}<option value={k.id}>{k.nama}</option>{/each}
-        </select>
-        <input type="number" min="0" bind:value={formNominal} placeholder="Nominal (Rp)"
-          class="w-full px-3 py-2 border rounded-lg" />
+        <div class="flex items-center justify-between">
+          <h3 class="font-bold text-gray-800">{editingId ? 'Edit Budget' : 'Tambah Budget'}</h3>
+          <button on:click={closeForm} class="text-gray-400"><X size="18" /></button>
+        </div>
+
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Kategori</label>
+          <select bind:value={formKategoriId} disabled={!!editingId}
+            class="w-full px-3 py-2 border border-gray-200 rounded-xl bg-white disabled:bg-gray-50 disabled:text-gray-500">
+            {#each kategori as k}<option value={k.id}>{k.nama}</option>{/each}
+          </select>
+        </div>
+
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">Nominal Budget <span class="text-red-500">*</span></label>
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">Rp</span>
+            <input
+              type="text"
+              inputmode="numeric"
+              placeholder="0"
+              value={formNominalStr}
+              on:input={onNominalInput}
+              class="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-right font-semibold focus:outline-none focus:border-indigo-500"
+            />
+          </div>
+        </div>
+
         <div class="flex gap-2">
-          <button on:click={saveBudget} disabled={busy}
-            class="flex-1 py-2 rounded-lg bg-indigo-600 text-white font-semibold disabled:opacity-50">Simpan</button>
-          <button on:click={() => (formOpen = false)} class="flex-1 py-2 rounded-lg bg-gray-100">Batal</button>
+          <button on:click={saveBudget} disabled={busy || parseRibu(formNominalStr) <= 0}
+            class="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white font-semibold disabled:opacity-50">
+            {busy ? 'Menyimpan...' : 'Simpan'}
+          </button>
+          <button on:click={closeForm}
+            class="flex-1 py-2.5 rounded-xl bg-gray-100 text-gray-700 font-semibold">
+            Batal
+          </button>
         </div>
       </div>
     {/if}
@@ -111,29 +180,44 @@
       <div class="bg-white rounded-2xl p-6 text-center border border-gray-100">
         <Wallet class="mx-auto mb-2 text-gray-400" size="32" />
         <p class="text-sm text-gray-500">Belum ada budget di {periode.bulan}/{periode.tahun}.</p>
+        <button on:click={openTambah}
+          class="mt-3 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl">
+          + Tambah Budget
+        </button>
       </div>
     {:else}
       <ul class="space-y-3">
         {#each statusList as s}
+          {@const b = budgets.find((b) => b.kategori_id === s.kategori_id)}
           {@const overflow = s.persen >= 100}
           {@const warn = s.persen >= 75 && !overflow}
           <li class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
             <div class="flex items-center justify-between">
-              <div>
+              <div class="flex-1 min-w-0 mr-3">
                 <p class="font-semibold text-gray-800">{s.kategori_nama}</p>
-                <p class="text-xs text-gray-500">
+                <p class="text-xs text-gray-500 mt-0.5">
                   Terpakai {formatRupiah(s.terpakai)} dari {formatRupiah(s.nominal_budget)}
                 </p>
               </div>
-              <button on:click={() => removeBudget(budgets.find((b) => b.kategori_id === s.kategori_id)?.id)} class="text-red-500"><Trash2 size="16" /></button>
+              <div class="flex items-center gap-2">
+                <button on:click={() => openEdit(s)}
+                  class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 hover:bg-indigo-100">
+                  <Pencil size="14" />
+                </button>
+                <button on:click={() => removeBudget(b?.id)}
+                  disabled={busyDelete === b?.id}
+                  class="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center text-red-500 hover:bg-red-100 disabled:opacity-50">
+                  <Trash2 size="14" />
+                </button>
+              </div>
             </div>
             <div class="mt-3 h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-              <div class="h-full transition-all"
-                style="width: {Math.min(100, s.persen)}%; background-color: {overflow ? '#ef4444' : warn ? '#f59e0b' : (s.kategori_warna || '#6366f1')};"></div>
+              <div class="h-full transition-all rounded-full"
+                style="width:{Math.min(100, s.persen)}%;background:{overflow ? '#ef4444' : warn ? '#f59e0b' : (s.kategori_warna || '#6366f1')}">
+              </div>
             </div>
             <p class="text-xs mt-1 {overflow ? 'text-red-600' : warn ? 'text-amber-600' : 'text-gray-500'}">
-              {s.persen}% terpakai
-              {#if overflow} • melebihi budget!{/if}
+              {s.persen}% terpakai{#if overflow} • melebihi budget!{/if}
             </p>
           </li>
         {/each}
