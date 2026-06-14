@@ -46,7 +46,7 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/2
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
       DEEPSEEK_BASE_URL: https://api.deepseek.com
-      DEEPSEEK_MODEL: deepseek-chat
+      DEEPSEEK_MODEL: deepseek-v4-pro
       UPLOAD_DIR: /app/uploads
       MAX_UPLOAD_MB: "20"
     depends_on:
@@ -75,7 +75,7 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/2
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
       DEEPSEEK_BASE_URL: https://api.deepseek.com
-      DEEPSEEK_MODEL: deepseek-chat
+      DEEPSEEK_MODEL: deepseek-v4-pro
       UPLOAD_DIR: /app/uploads
       MAX_UPLOAD_MB: "20"
     depends_on:
@@ -102,7 +102,7 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/2
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
       DEEPSEEK_BASE_URL: https://api.deepseek.com
-      DEEPSEEK_MODEL: deepseek-chat
+      DEEPSEEK_MODEL: deepseek-v4-pro
     depends_on:
       celery_worker:
         condition: service_started
