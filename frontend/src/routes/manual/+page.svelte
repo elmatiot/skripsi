@@ -41,6 +41,16 @@
     e.target.value = nominalStr;
   }
 
+  function onHargaItemInput(e, idx) {
+    const digits = e.target.value.replace(/\D/g, '');
+    const formatted = digits ? formatRibu(digits) : '';
+    e.target.value = formatted;
+    items.update((arr) => {
+      arr[idx] = { ...arr[idx], harga_satuan: Number(digits) || 0 };
+      return [...arr];
+    });
+  }
+
   // Jika item ditambah, sinkronkan nominal dengan subtotal item
   $: if ($totalDerived > 0) nominalStr = formatRibu($totalDerived);
 
@@ -225,8 +235,14 @@
                 class="col-span-5 px-3 py-2 border border-gray-200 rounded-lg text-sm" />
               <input type="number" min="1" bind:value={it.qty}
                 class="col-span-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-center" />
-              <input type="number" bind:value={it.harga_satuan} placeholder="Harga"
-                class="col-span-4 px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+              <input
+                type="text"
+                inputmode="numeric"
+                placeholder="0"
+                value={it.harga_satuan ? formatRibu(it.harga_satuan) : ''}
+                on:input={(e) => onHargaItemInput(e, idx)}
+                class="col-span-4 px-3 py-2 border border-gray-200 rounded-lg text-sm text-right"
+              />
               <button on:click={() => removeItem(idx)} class="col-span-1 text-red-500"><Trash2 size="16" /></button>
             </div>
           {/each}
