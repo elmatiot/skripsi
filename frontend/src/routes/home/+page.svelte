@@ -49,9 +49,12 @@
 
   async function generateInsight() {
     triggering = true;
+    errorMsg = '';
     try {
       await api.generateInsight();
       setTimeout(refresh, 2500);
+    } catch (e) {
+      errorMsg = e?.message || 'Gagal generate insight';
     } finally {
       setTimeout(() => (triggering = false), 2500);
     }

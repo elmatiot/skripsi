@@ -2,7 +2,7 @@ import asyncio
 import json
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 
@@ -31,12 +31,18 @@ def list_insight(
 
 @router.post("/generate", response_model=InsightTriggerOut, status_code=202)
 def trigger_generate(
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    from celery_app import generate_insight_task
-    task = generate_insight_task.delay(str(user.id))
-    return InsightTriggerOut(task_id=task.id)
+    try:
+        from celery_app import generate_insight_task
+        task = generate_insight_task.delay(str(user.id))
+        return InsightTriggerOut(task_id=task.id)
+    except Exception:
+        from tasks.insight import generate_insight_task as _fn
+        background_tasks.add_task(_fn, str(user.id))
+        return InsightTriggerOut(task_id="background")
 
 
 @router.post("/{insight_id}/read", response_model=InsightOut)
