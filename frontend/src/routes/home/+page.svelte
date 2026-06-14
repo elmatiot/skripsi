@@ -13,24 +13,29 @@
   let insights = [];
   let loading = true;
   let triggering = false;
+  let errorMsg = '';
 
   onMount(refresh);
 
   async function refresh() {
     loading = true;
-    try {
-      const periode = currentPeriode();
-      const [s, t, i] = await Promise.all([
-        api.statistik(periode),
-        api.listTransaksi({ limit: 5 }),
-        api.listInsight()
-      ]);
-      stat = s;
-      recent = t.items || [];
-      insights = i.slice(0, 3);
-    } finally {
-      loading = false;
-    }
+    errorMsg = '';
+    const periode = currentPeriode();
+    const [s, t, i] = await Promise.allSettled([
+      api.statistik(periode),
+      api.listTransaksi({ limit: 5 }),
+      api.listInsight()
+    ]);
+
+    if (s.status === 'fulfilled') stat = s.value;
+    else errorMsg = s.reason?.message || 'Gagal memuat statistik';
+
+    if (t.status === 'fulfilled') recent = t.value?.items || [];
+    else if (!errorMsg) errorMsg = t.reason?.message || 'Gagal memuat transaksi';
+
+    if (i.status === 'fulfilled') insights = i.value?.slice(0, 3) ?? [];
+
+    loading = false;
   }
 
   async function generateInsight() {
@@ -91,6 +96,9 @@
   </div>
 
   <div class="px-6 -mt-4 space-y-6">
+    {#if errorMsg}
+      <div class="bg-red-50 border border-red-200 text-red-700 rounded-2xl px-4 py-3 text-sm">{errorMsg}</div>
+    {/if}
     <div class="grid grid-cols-2 gap-3">
       <button on:click={() => goto('/manual')} class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 text-left">
         <div class="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center mb-2">
